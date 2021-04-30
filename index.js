@@ -43,5 +43,5 @@ return;
 });
 
 client.on("message", msg => fun.Body(msg));
-//client.on("userUpdate", user => fun.Update(user));
+client.on("userUpdate", (user, usernew) => fun.Update(user, usernew));
 client.login(process.env.TOKEN);

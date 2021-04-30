@@ -5,7 +5,11 @@ var queue3s = [];
 var queue2s = [];
 var queue1s = [];
 var lobby = [];
+var games = [];
 
+//COSTANTI GENERICHE
+const TIME_MSG = 100;
+const timer = ms => new Promise( res => setTimeout(res, ms));
 
 //ConfigFile
 const cfg = require("../config.js");
@@ -13,37 +17,13 @@ const cfg = require("../config.js");
 //Librerie
 const db = require("./db.js");
 const preLobby = require("../class/pre-lobby.js");
+const clobby = require("../class/pre-lobby.js");
 
-/*  TO DO LIST SIX ARROWS
-- .c: I capitani sono le 2 persone più alte in classifica.
-- .r: team completamente randomici
-- report partita
-- try e catch
-- Velocizzare algoritmi per la creazione della lobby al 6 player
-- cambiare i change dell'user
-- Cancella l'utente dalle altre queue quando crea una lobby
-- fix SQL injection
-- CONFIG con json
-- canali personalizzati
-- Integrazione API RL (?)
-- refresh del nome se lo cambia
-- Nella votazione per scegliere bisogna avere una maggioranza tra le 2 modalità, quindi avere almeno 4 voti per .c o 4 voti per .r || In caso di parità, si darà la priorità al .c 
-- Backup db
-
-- Mettere che i comandi funzionano solo nelle chat apposite. 
-- Lo staff + helper possono modificare i punti delle varie modalità e modificare alcuni problemi del bot.
-*PUNTEGGI*
-  In caso una squadra vinca  2-0 si vincono 5 punti
-  In caso una squadra perda 2-0 si perdono 4 punti
-  In caso una squadra vinca 2-1 si vincono 3 punti
-  In caso una squadra perda 2-1 si perdono  2 punti
-*/
-
-function setup(c, msg){
+async function setup(c, msg){
   client = c;
   MessageEmbed = msg;
 
-  db.dbStart();
+  await db.dbStart();
 }
 
 //Funzione printa tutto un array. || DEBUG
@@ -61,6 +41,8 @@ async function Embed(channel, title, description) {
       .setColor(0xff0000)
       .setDescription(description)
       .setFooter("Created by Halex_");
+    
+    //await timer(TIME_MSG);
     await channel.send(embed);
 }
 
@@ -91,14 +73,10 @@ async function ErrorDM(user, title, description) {
     await user.send(embed);
 }
 
-
-async function Update(user){//Update user if change paramater
-  console.log(user);
-}
-
 //Funzione per aggiungere il tag ai player
 async function TagPlayer(queue){
   var str = "";
+  
   for(var i = 0; i < queue.length ; i++){
     if(i < queue.length-1)
       str += "<@" + queue[i].id + ">, ";
@@ -106,14 +84,12 @@ async function TagPlayer(queue){
       str += "<@" + queue[i].id + ">";
   }
 
-  return new Promise(function(resolve, reject) {
-    resolve(str);
-  });
+  return str;
 }
 
 //Funzione per mandare un messaggio normale.
 async function SendMSG(channel, txt){
-  channel.send(txt);
+  await channel.send(txt);
 }
 
 //Funzione per mandare un messaggio normale.
@@ -133,26 +109,23 @@ async function getIdLobby(user){
     }
     i++;
   }
-  return new Promise(function(resolve, reject) {
-    resolve(trov);
-  });
+
+  return trov;
 }
 
 //Funzione per verificare se un utente è in un altra lobby.
 async function isLobby(user){
   var i = 0;
-  var trov = 0;
+  var trov = false;
 
-  while(i < lobby.length && trov == 0){
-
+  while(i < lobby.length && !trov){
     if(await lobby[i].hasPlayer(user.id)){
-      trov = 1;
+      trov = true;
     }
     i++;
   }
-  return new Promise(function(resolve, reject) {
-    resolve(trov == 1);
-  });
+
+  return trov;
 }
 
 //Funzione per verificare se un utente è in un altra lobby.
@@ -160,26 +133,19 @@ async function isCap(user){
   var id = await getIdLobby(user);
   if(id === -1) return;
 
-  var res = await lobby[id].isCap(user.id);
-  
-  return new Promise(function(resolve, reject) {
-    resolve(res);
-  });
+  return await lobby[id].isCap(user.id);
 }
 
 //Aggiorna o inserisce l'utente nel db
 //Restituisce true se lo inserisce, false se da errore.
 async function setUser(data, table){
-  return new Promise(function(resolve, reject) {
-    try {
-      db.setUser(table, data);
-      resolve(true);
-    }
-    catch (e) {
-      console.log(e);
-      reject(false);
-    }
-  });
+  try {
+    await db.setUser(table, data);
+    return true;
+  }
+  catch (e) {
+    return false;
+  }
 }
 
 //Crea i dati per l'utente e li inserisce nel db
@@ -194,9 +160,105 @@ async function createUser(user, guild, modality){
     lose: 0,
     points: 0
   }
-  return new Promise(function(resolve, reject) {
-    resolve(setUser(data, modality));
-  });
+
+  return setUser(data, modality);
+}
+
+async function randomTeam(l){
+
+  var vote = await l.getVote("r");
+  var max = await l.getSizeQueue();
+
+  if(vote >= max/2){
+    await l.setNoVotable();
+    var players = await l.getPlayers();
+    var i = 0;
+
+    while(players.length > 0){
+      var rand = await Math.round(await Math.random() * ((players.length-1) - 0)) + 0;
+
+      if(i % 2 === 0)
+        await l.addTeam1(players[rand]);
+      else
+        await l.addTeam2(players[rand]);
+      
+      i++;
+    }
+
+    await Embed(await l.getChannel(), "Lobby" , await l.teamToString());
+    await createLobby(l);
+  }
+}
+
+async function resetArray(queue){
+  while(queue.length > 0){
+    await queue.splice(0, 1);
+  }
+}
+
+async function isQueue(queue, user){
+  var i = 0;
+  var trov = false;
+
+  while(i < queue.length && !trov){
+    if(queue[i].id === user.id){
+      trov = true;
+    }
+    i++;
+  }
+
+  return trov;
+}
+
+async function getDate(){
+  let date_ob = new Date();
+  // current date
+  // adjust 0 before single digit date
+  let date = ("0" + date_ob.getDate()).slice(-2);
+
+  // current month
+  let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
+
+  // current year
+  let year = date_ob.getFullYear();
+
+  // current hours
+  let hours = date_ob.getHours();
+
+  // current minutes
+  let minutes = date_ob.getMinutes();
+
+  // current seconds
+  let seconds = date_ob.getSeconds();
+
+  // prints date in YYYY-MM-DD format
+  console.log(year + "-" + month + "-" + date);
+
+  // prints date & time in YYYY-MM-DD HH:MM:SS format
+  str = date + "/" + month + "/" + year + " " + hours + ":" + minutes + ":" + seconds;
+
+  return str;
+}
+
+//Crea i dati per l'utente e li inserisce nel db
+//Restituisce true se lo inserisce, false se da errore.
+async function createLobby(l){
+
+  data = {
+    id: await db.count("lobby"),
+    team1: await l.getTeam1().toString(),
+    team2: await l.getTeam2().toString(),
+    date: await getDate(),
+    win: ""
+  }
+  
+  await db.setLobby(data);
+}
+
+
+async function Update(old, newuser){//Update user if change paramater
+  console.log(old);
+  console.log(newuser);
 }
 
 async function Body(msg) {
@@ -216,20 +278,19 @@ async function Body(msg) {
     const args = commandBody.split(' '); //splitto il comando e tutti gli argomenti (se ci sono)
     const command = args.shift().toLowerCase(); //prendo solo il comando
 
+    var queue = queue3s;
+
     if (command === 'ping') {
       await channel.send('pong');
     }
-    else if(command === 'q' ){//&& !queue.includes(user.id)
+    else if(command === 'q'){
 
-      var queue = queue3s;
-      var result = await isLobby(user);
-
-      if(result){
-        Error(channel,"Errore" , "Sei già in un altra lobby, non puoi entrare in coda");
+      if(await isLobby(user) ){ //|| await isQueue(queue, user)
+        await Error(channel,"Errore" , "Sei in coda o hai già una lobby in corso, non puoi entrare in coda");
         return;
       } 
 
-      data = db.getUser("rl-3s", user.id, guild.id); //Prendo l'utente
+      data = await db.getUser("rl-3s", user.id, guild.id); //Prendo l'utente
 
       if(!data){ //Se l'utente non è presente nel db, creo la variabile e lo aggiungo
         if(!(await createUser(user, guild, "rl-3s"))){
@@ -238,25 +299,23 @@ async function Body(msg) {
         }
       }
 
-      queue.push(user);
+      await queue.push(user);
 
-      if(queue.length == 6){
-        var players = await TagPlayer(queue);
-        
+      if(queue.length === 6){ //OCCHIO ALLO STOP MSG
+
+        await lobby.push(new preLobby(queue, channel));
         var str = "6 Persone sono entrare nella queue e verrà creata la lobby.\n" +
-        "**Players:** " + players + "\n" +
-        "Scegliere la modalità della lobby, Capitani (.c) o Random (.r)";
+        "**Players:** " + await TagPlayer(queue) + "\n" +
+        "Scegliere la modalità della lobby, Capitani (,c) o Random (,r)";
 
+        await resetArray(queue);
         await Embed(channel, "Lobby", str);
-        lobby.push(new preLobby(queue, channel));
-        queue = [];
       }
       else{
         await Embed(channel,"Lista" , queue.length + ' giocatori nella lista!');
       }
-        
     }
-    else if(command === 'l' && queue.includes(user.id)){
+    else if(command === 'l' && await isQueue(queue, user)){
       await queue.pop(user.id);
       await Embed(channel,"Lista" , queue.length + ' giocatori nella lista!');
     }
@@ -265,36 +324,57 @@ async function Body(msg) {
       var r = await getIdLobby(user);
 
       if(r < 0){
-        Error(channel,"Errore" , "Non sei in nessuna lobby");
+        await Error(channel,"Errore" , "Non sei in nessuna lobby");
         return;
       }
 
       var l = lobby[r];
 
-      l.addVote(user, "c");
+      if(await l.isVotable())
+        return;
+
+      await l.addVote(user, "c");
 
       var vote = await l.getVote("c");
       var max = await l.getSizeQueue();
 
-      console.log("voti:" + vote);
       if(vote > max/2){
       
+        await l.setNoVotable();
+
         var players = await l.returnPlayers();
-        var row = db.getScoreLobby("rl-3s", guild, players);
+        var row = await db.getScoreLobby("rl-3s", guild, players);
         var cap1 = await l.getPlayer(row[0].user);
         var cap2 = await l.getPlayer(row[1].user);
 
         await l.setCap(cap1, cap2);
         await SendDM(cap1, "Scegli un player", "Scrivi il numero del player che vuoi in squadra:\n" + await l.choosePlayer());
       }
-      else{
-        console.log("r");
+      else if(vote === max/2){
+        await randomTeam(l);
       }
     }
     else if(command === 'r'){
-      console.log("r");
+      var r = await getIdLobby(user);
+
+      if(r < 0){
+        await Error(channel,"Errore" , "Non sei in nessuna lobby");
+        return;
+      }
+
+      var l = lobby[r];
+
+      if(await l.isVotable())
+        return;
+
+      await l.addVote(user, "r");
+
+      await randomTeam(l);
     }
     else if(command === 'test'){
+
+      console.log("----------QUEUE-------------");
+      console.log(queue);
 
       console.log("----------Lobby-------------");
       console.log(lobby);
@@ -320,14 +400,14 @@ async function Body(msg) {
       
     }
   }
-  else if((await isCap(user))){ //Sono nei DM e sono capitano
+  else if(await isCap(user)){ //Sono nei DM e sono capitano
     
     const args = msg.content.split(' '); //splitto il comando e tutti gli argomenti (se ci sono)
     const command = args.shift().toLowerCase(); //prendo solo il comando
 
     var j = await getIdLobby(user);
     var l = lobby[j];
-    var id = parseInt(command);
+    var id = await parseInt(command);
 
     //Se l'id non è valido, esco
     if (!id)
@@ -343,6 +423,7 @@ async function Body(msg) {
 
     if(await l.getSizeQueue() === 0){
       await Embed(await l.getChannel(), "Lobby" , await l.teamToString());
+      await createLobby(l);
       return;
     }
     else if(await l.firstCap(user.id)){
@@ -355,4 +436,4 @@ async function Body(msg) {
   //msg.delete();
 }
 
-module.exports = { Body, setup};
+module.exports = { Body, setup, Update};

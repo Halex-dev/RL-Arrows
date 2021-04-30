@@ -5,30 +5,66 @@ const internal = {};
 module.exports = class PreLobby{
 
   constructor(players, channel) {
-      this.players = players;
+      this.players = players.slice();
       this.channel = channel;
       this.choose = 1;
       this.team1 = [];
       this.team2 = [];
       this.voto = {
+        votable: false,
         r: [],
         c: []
       }
   }
 
-  //Funzione aggiunge un voto
-  addVote(user, type){
-    if(this.alreadyVote(user, type))
-      return;
+  //Funzione che restituisce la classe user dell'utente cercato tramite index
+  async getIndexPlayer(userid){
+    var i = 0;
+    var id = -1;
+    var data = this.players;
 
-    if(type === "r")
-      this.voto.r.push(user.id);
-    else
-      this.voto.c.push(user.id);
+    while(i < data.length && id < 0){
+      if(data[i].id === userid){
+          id = i;
+      }
+        i++;
+    }
+    
+    return id;
+  }
+
+  //Funzione per impostare i capitani (li rimuove automaticamente dalla lista)
+  async setCap(cap1, cap2){
+    await this.addTeam1(cap1);
+    await this.addTeam2(cap2);
   }
 
   //Funzione aggiunge un voto
-  alreadyVote(user, type){
+  async addVote(user, type){
+    /*if(this.alreadyVote(user, type))
+      return;*/
+
+    if(type === "r")
+      await this.voto.r.push(user.id);
+    else
+      await this.voto.c.push(user.id);
+  }
+
+  //Funzione che restituisce true se sei il primo capitano, false altrimenti
+  async firstCap(userid){
+    var c1 = await this.getCap1();
+
+    if(c1 === undefined)
+      return false;
+
+    if(c1.id === userid)
+      true;
+    else
+      false;
+  }
+
+  //Funzione aggiunge un voto
+  async alreadyVote(user, type){
     if(type === "r")
       return this.voto.r.includes(user.id);
     else
@@ -36,43 +72,51 @@ module.exports = class PreLobby{
   }
 
   //Funzione che sceglie un player da inserire nel team
-  chooseMember(me, user){
+ async chooseMember(me, user){
 
-    if(this.firstCap(me.id)){
-      this.addTeam1(user);
+    if(await this.firstCap(me.id)){
+      await this.addTeam1(user);
     }
     else{
-      this.addTeam2(user);
+      await this.addTeam2(user);
     }
 
     if(this.players.length === 1){    
-      this.addTeam2(this.players[0]);
+      await this.addTeam2(this.players[0]);
     }
 
     this.choose++;
   }
 
   //Funzione che rimuove un player dalla scelta
-  remPlayer(user){
-    var index = this.getIndexPlayer(user.id);
+  async remPlayer(user){
+    var index = await this.getIndexPlayer(user.id);
 
     if(index == -1) return;
 
-    var data = this.players;
-    
-    data.splice(index, 1);
-
+    await this.players.splice(index, 1);
   }
 
   //Funzione che aggiunge un utente al team1
-  addTeam1(user){
-    this.team1.push(user);
-    this.remPlayer(user);
+  async addTeam1(user){
+    await this.team1.push(user);
+    await this.remPlayer(user);
   }
 
-  addTeam2(user){
-    this.team2.push(user);
-    this.remPlayer(user);
+  //Funzione che aggiunge un utente al team2
+  async addTeam2(user){
+    await this.team2.push(user);
+    await this.remPlayer(user);
+  }
+
+  //Funzione restituisce il primo team
+  async getTeam1(user){
+    return this.team1;
+  }
+
+  //Funzione restituisce il secondo team
+  async getTeam2(user){
+    return this.team2;
   }
 
   //Funzione aggiunge un voto
@@ -83,9 +127,7 @@ module.exports = class PreLobby{
     else
       vote = this.voto.c.length;
 
-    return new Promise(function(resolve, reject) {
-      resolve(vote);
-    });
+    return vote;
   }
 
   
@@ -94,16 +136,31 @@ module.exports = class PreLobby{
     var i = 0;
     var id = -1;
 
-    while(i < this.players.length && id < 0){
-      if(this.players[i].id == userid || await this.isCap(userid)){
+    while(id < 0 && i < this.players.length ){
+      if(this.players[i].id == userid){
         id = i;
-      }
+      }  
       i++;
     }
 
-    return new Promise(function(resolve, reject) {
-      resolve(id >= 0);
-    });
+    while(id < 0 && i < this.team1.length ){
+      if(this.team1[i].id == userid){
+        id = i;
+      }  
+      i++;
+    }
+
+    while(id < 0 && i < this.team2.length ){
+      if(this.team2[i].id == userid){
+        id = i;
+      }  
+      i++;
+    }
+
+    if(id >= 0)
+      return true;
+    else
+      return false;
   }
 
   //Funzione che restituisce se tocca all'utente scegliere
@@ -112,23 +169,25 @@ module.exports = class PreLobby{
     var cap2 = await this.getCap2();
     var choose = this.choose;
 
-    return new Promise(function(resolve, reject) {
-      if(cap1.id === userid){
-        resolve(choose % 2 === 1);
+    if(await this.firstCap(userid)){
+      if(choose % 2 === 1)
+        return true;
+      else{
+        return false;
       }
-      else if(cap2.id === userid){
-        resolve(choose % 2 === 0);
+    }
+    else{
+      if(choose % 2 === 0)
+        return true;
+      else{
+        return false;
       }
-      
-    });
+    }
   }
 
   //Funzione che restituisce tutti i player della lobby non ancora scelti
   async returnPlayers(){
-    var data = this.players;
-    return new Promise(function(resolve, reject) {
-      resolve(data);
-    });
+    return this.players;
   }
 
   //Funzione che restituisce una stringa con i giocatori rimanenti da scegliere
@@ -140,9 +199,7 @@ module.exports = class PreLobby{
         str += (i+1) + " ---> " + "<@"+ data[i].id + ">\n";
     }
 
-    return new Promise(function(resolve, reject) {
-      resolve(str);
-    });
+    return str;
   }
 
    //Funzione che restituisce una stringa con i giocatori rimanenti da scegliere
@@ -150,18 +207,22 @@ module.exports = class PreLobby{
     var str = "**Team1:**\n";
     
     for(var i = 0; i < this.team1.length ; i++){
+      if(i < this.team1.length-1)
+        str += "<@"+ this.team1[i].id + ">, ";
+      else
         str += "<@"+ this.team1[i].id + ">";
     }
 
     str += "\n**Team 2:**\n";
 
     for(var i = 0; i < this.team2.length ; i++){
+      if(i < this.team2.length-1)
+        str += "<@"+ this.team2[i].id + ">, ";
+      else
         str += "<@"+ this.team2[i].id + ">";
     }
 
-    return new Promise(function(resolve, reject) {
-      resolve(str);
-    });
+    return str;
   }
 
   //Funzione che incrementa di uno il voto di r
@@ -176,18 +237,22 @@ module.exports = class PreLobby{
 
   //Funzione che restituisce i voti di c
   async getC(){
-    var data = this.voto.c;
-    return new Promise(function(resolve, reject) {
-      resolve(data);
-    });
+    return this.voto.c;
   }
 
   //Funzione che restituisce i voti di r
   async getR(){
-    var data = this.voto.r;
-    return new Promise(function(resolve, reject) {
-      resolve(data);
-    });
+    return this.voto.r;
+  }
+
+  //Funzione che restituisce se la lobby è ancora votabile o no
+  async isVotable(){
+    return this.voto.votable;
+  }
+
+  //Funzione che restituisce se la lobby è ancora votabile o no
+  async setNoVotable(){
+    this.voto.votable = true;
   }
 
   //Funzione che restituisce la classe user dell'utente cercato
@@ -204,68 +269,26 @@ module.exports = class PreLobby{
       }
       i++;
     }
-    return new Promise(function(resolve, reject) {
-      if(id >= 0)
-        resolve(data[id]);
-      else
-        resolve(-1);
-    });
+
+    if(id >= 0)
+      return data[id];
+    else
+      return -1;
   }
 
   //Funzione che restituisce la classe user dell'utente cercato tramite index
   async getPlayerByIndex(index){
-    var data = this.players;
-    return new Promise(function(resolve, reject) {
-      try{
-        resolve(data[index]);
-      }
-      catch (e) {
-        reject(-1);
-      }
-      
-    });
+    try{
+      return this.players[index];
+    }
+    catch (e) {
+      return -1;
+    }
   }
 
   //Funzione che restituisce la classe user dell'utente cercato tramite index
   async getSizeQueue(){
-    var data = this.players;
-
-    return new Promise(function(resolve, reject) {
-        resolve(data.length);
-    });
-  }
-
-  //Funzione che restituisce la classe user dell'utente cercato tramite index
-  async getIndexPlayer(userid){
-    var i = 0;
-    var id = -1;
-
-    var data = this.players;
-
-    while(i < data.length && id < 0){
-      if(data[i].id === userid){
-        id = i;
-      }
-      i++;
-    }
-    return new Promise(function(resolve, reject) {
-      resolve(id);
-    });
-  }
-
-  //Funzione per impostare i capitani (li rimuove automaticamente dalla lista)
-  async setCap(cap1, cap2){
-    this.addTeam1(cap1);
-    this.addTeam2(cap2);
-  }
-
-  //Funzione che restituisce true se sei il primo capitano, false altrimenti
-  async firstCap(userid){
-    var c1 = await this.getCap1();
-
-    return new Promise(function(resolve, reject) {
-      resolve(c1.id === userid);     
-    });
+    return this.players.length;
   }
 
   //Funzione che restituisce true o false in base se l'utente è capitano
@@ -273,12 +296,13 @@ module.exports = class PreLobby{
     var c1 = await this.getCap1();
     var c2 = await this.getCap2();
 
-    return new Promise(function(resolve, reject) {
-      if(c1 && c2)
-        resolve(c1.id === userid || c2.id === userid);
-      else
-        resolve(false);
-    });
+    if(c1 === undefined && c2 === undefined)
+      return false;
+
+    if(c1.id === userid || c2.id === userid)
+      return true;
+    else
+      return false;
   }
 
   //Funzione che restituisce il secondo capitano
@@ -288,9 +312,7 @@ module.exports = class PreLobby{
     if(!c2)
       return;
 
-    return new Promise(function(resolve, reject) {
-      resolve(c2);
-    });
+    return c2;
   }
 
   //Funzione che restituisce il primo capitano
@@ -300,24 +322,16 @@ module.exports = class PreLobby{
     if(!c1)
       return;
 
-    return new Promise(function(resolve, reject) {
-      resolve(c1);
-    });
+    return c1;
   }
 
-  //Funzione che restituisce il primo capitano
+  //Funzione che restituisce il channel in cui era stata creata la lobby
   async getChannel(){
-    var ch = this.channel;
-    return new Promise(function(resolve, reject) {
-      resolve(ch);
-    });
+    return this.channel;
   }
 
-  //Funzione che restituisce il primo capitano
-  async getChannel(){
-    var ch = this.channel;
-    return new Promise(function(resolve, reject) {
-      resolve(ch);
-    });
+  //Funzione che restituisce il channel in cui era stata creata la lobby
+  async getPlayers(){
+    return this.players;
   }
  };

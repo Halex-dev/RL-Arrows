@@ -3,7 +3,7 @@ const SQLite = require("better-sqlite3");
 const sql = new SQLite('./db/user.sqlite');
 
 //Funzione per la preparazione del database
-function dbStart() {
+async function dbStart() {
   //Controllo se la tabella esiste, altrimenti la creo, una per ogni modalità di rocket 
 
   //---------------------------------- ROCKET LEAGUE ------------------------------
@@ -21,7 +21,7 @@ function dbStart() {
 
   //---------------------------------- LOBBY ------------------------------
   //3s
-  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id TEXT PRIMARY KEY, team1 TEXT, team2 TEXT, data TEXT, win INTEGER);").run();
+  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id TEXT PRIMARY KEY, team1 TEXT, team2 TEXT, date TEXT, win TEXT);").run();
   sql.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uniqueID ON 'lobby' (id);").run();
 
   //Impostazioni Database
@@ -32,20 +32,21 @@ function dbStart() {
 }
 
 //Funzione per ottenere i dati di un utente su una det tabella
-function getUser(table, userid, guildid){
-  return sql.prepare(`SELECT * FROM \'${table}\' WHERE user = ? AND guild = ?`).get(userid, guildid);
+async function getUser(table, userid, guildid){
+  return await sql.prepare(`SELECT * FROM \'${table}\' WHERE user = ? AND guild = ?`).get(userid, guildid);
 }
 
 //Funzione per settare i dati di un utente su una det tabella nel db
-function setUser(table, data){
+async function setUser(table, data){
   sql.prepare(`INSERT OR REPLACE INTO \'${table}\' (id, user, guild, tag, win, lose, points) VALUES (@id, @user, @guild, @tag, @win, @lose, @points);`).run(data);
 }
 
-function getLead(table, limit, guild){
-  return sql.prepare(`SELECT * FROM \'${table}\' WHERE guild = ? ORDER BY points DESC LIMIT ?;`).all(guild.id, limit);
+//Funzione ottenere una leaderboard
+async function getLead(table, limit, guild){
+  return await sql.prepare(`SELECT * FROM \'${table}\' WHERE guild = ? ORDER BY points DESC LIMIT ?;`).all(guild.id, limit);
 }
 
-function getScoreLobby(table, guild, users){
+async function getScoreLobby(table, guild, users){
 
   str = "(";
   for(var i = 0; i < users.length ; i++){
@@ -57,12 +58,27 @@ function getScoreLobby(table, guild, users){
   }
   str += ")";
 
-  return sql.prepare(`SELECT user, points FROM \'${table}\' WHERE user IN ${str} AND guild = ? ORDER BY points DESC LIMIT 2;`).all(guild.id);
+  return await sql.prepare(`SELECT user, points FROM \'${table}\' WHERE user IN ${str} AND guild = ? ORDER BY points DESC LIMIT 2;`).all(guild.id);
 
 }
 
-function getScore(table, guild, user){
-  return sql.prepare(`SELECT points FROM \'${table}\' WHERE guild = ? AND guild = ?;`).all(guild.id, user.id);
+async function getScore(table, guild, user){
+  return await sql.prepare(`SELECT points FROM \'${table}\' WHERE guild = ? AND guild = ?;`).all(guild.id, user.id);
 }
 
-module.exports = { dbStart, getUser, setUser, getScoreLobby, getLead};
+//Funzione per settare i dati di una lobby nel db
+async function setLobby(data){
+  sql.prepare(`INSERT OR REPLACE INTO \'lobby\' (id, team1, team2, date, win) VALUES (@id, @team1, @team2, @date, @win);`).run(data);
+}
+
+//Funzione per ottenere le lobby
+async function getLobby(){
+  return await sql.prepare(`SELECT * FROM \'lobby\'`).get();
+}
+
+//Funzione per ottenere le lobby
+async function count(table){
+  return await sql.prepare(`COUNT(*) FROM \'${table}\'`).get();
+}
+
+module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, count };

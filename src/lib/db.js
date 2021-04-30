@@ -78,7 +78,7 @@ async function getLobby(){
 
 //Funzione per ottenere le lobby
 async function count(table){
-  return await sql.prepare(`COUNT(*) FROM \'${table}\'`).get();
+  return await sql.prepare(`SELECT COUNT(*) AS num FROM \'${table}\'`).get();
 }
 
 module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, count };

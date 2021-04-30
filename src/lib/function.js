@@ -231,9 +231,6 @@ async function getDate(){
   // current seconds
   let seconds = date_ob.getSeconds();
 
-  // prints date in YYYY-MM-DD format
-  console.log(year + "-" + month + "-" + date);
-
   // prints date & time in YYYY-MM-DD HH:MM:SS format
   str = date + "/" + month + "/" + year + " " + hours + ":" + minutes + ":" + seconds;
 
@@ -245,7 +242,7 @@ async function getDate(){
 async function createLobby(l){
 
   data = {
-    id: await db.count("lobby"),
+    id: await db.count("lobby").num,
     team1: await l.getTeam1().toString(),
     team2: await l.getTeam2().toString(),
     date: await getDate(),
@@ -253,6 +250,7 @@ async function createLobby(l){
   }
   
   await db.setLobby(data);
+  //await games.push
 }
 
 

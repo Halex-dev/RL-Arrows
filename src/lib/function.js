@@ -144,13 +144,34 @@ async function setUser(data, table){
     return true;
   }
   catch (e) {
+    await log(e);
     return false;
   }
 }
 
+//Aggiorna o inserisce l'utente nel db
+//Restituisce true se lo inserisce, false se da errore.
+async function log(e){
+  await console.log(e);
+}
+
+//Aggiorna o inserisce l'utente nel db
+//Restituisce true se lo inserisce, false se da errore.
+async function setGlobalUser(data){
+  try {
+    await db.setGlobalUser(data);
+    return true;
+  }
+  catch (e) {
+    await log(e);
+    return false;
+  }
+}
+
+
 //Crea i dati per l'utente e li inserisce nel db
 //Restituisce true se lo inserisce, false se da errore.
-async function createUser(user, guild, modality){
+async function createUserModality(user, guild, modality){
   data = {
     id: `${guild.id}-${user.id}`,
     user: user.id,
@@ -162,6 +183,15 @@ async function createUser(user, guild, modality){
   }
 
   return setUser(data, modality);
+}
+
+async function createUser(user){
+  data = {
+    id: `${user.id}`,
+    tag: user.tag
+  }
+
+  return setGlobalUser(data);
 }
 
 async function randomTeam(l){
@@ -237,12 +267,12 @@ async function getDate(){
   return str;
 }
 
-//Crea i dati per l'utente e li inserisce nel db
-//Restituisce true se lo inserisce, false se da errore.
+//Inserisce la lobby nel db
 async function createLobby(l){
+  var tmp = await db.count("lobby");
 
-  data = {
-    id: await db.count("lobby").num,
+  data = {//DA FARE CHE METTE SOLO I NOMI SUL GETTEAM, CREARE FUNZIONE
+    id: tmp.num,
     team1: await l.getTeam1().toString(),
     team2: await l.getTeam2().toString(),
     date: await getDate(),
@@ -250,9 +280,25 @@ async function createLobby(l){
   }
   
   await db.setLobby(data);
-  //await games.push
+  await games.push(data);
 }
 
+//Crea i dati per l'utente e li inserisce nel db
+//Restituisce true se lo inserisce, false se da errore.
+async function getLobby(l){
+  var rows = await db.getLobbyReport();
+
+  for(var i = 0; i < rows.length ; i++){
+    data = {
+      id: rows[i].id,
+      team1: rows[i].team1,
+      team2: rows[i].team2,
+      date: rows[i].date,
+      win: ""
+    }
+    await games.push();
+  }
+}
 
 async function Update(old, newuser){//Update user if change paramater
   console.log(old);
@@ -288,10 +334,19 @@ async function Body(msg) {
         return;
       } 
 
-      data = await db.getUser("rl-3s", user.id, guild.id); //Prendo l'utente
+      data = await db.getGlobalUser(user.id); //Prendo l'utente
 
       if(!data){ //Se l'utente non è presente nel db, creo la variabile e lo aggiungo
-        if(!(await createUser(user, guild, "rl-3s"))){
+        if(!(await createUser(user))){
+          await Error(channel,"DB" , "Errore nell'inserimento dell'utente");
+          return;
+        }
+      }
+
+      data = await db.getUser("rl-3s", user.id, guild.id); //Prendo l'utente
+
+      if(!data){ //Se l'utente non è presente nella modalità desiderata, lo aggiungo
+        if(!(await createUserModality(user, guild, "rl-3s"))){
           await Error(channel,"DB" , "Errore nell'inserimento dell'utente");
           return;
         }

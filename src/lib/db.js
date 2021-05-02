@@ -55,6 +55,16 @@ async function getGlobalUser(id){
   return await sql.prepare(`SELECT * FROM 'user' WHERE id = ?`).get(id);
 }
 
+//Funzione per aggiornate la win
+async function setWin(table ,userid, guildid){
+  return await sql.prepare(`UPDATE \'${table}\' SET win = win + 1 WHERE user = ? AND guild = ?`).run(userid, guildid);
+}
+
+//Funzione per aggiornate la lose
+async function setLose(table ,userid, guildid){
+  return await sql.prepare(`UPDATE \'${table}\' SET lose = lose + 1 WHERE user = ? AND guild = ?`).run(userid, guildid);
+}
+
 //Funzione ottenere una leaderboard
 async function getLead(table, limit, guild){
   return await sql.prepare(`SELECT * FROM \'${table}\' WHERE guild = ? ORDER BY points DESC LIMIT ?;`).all(guild.id, limit);
@@ -105,4 +115,4 @@ async function count(table){
   return await sql.prepare(`SELECT COUNT(*) AS num FROM \'${table}\'`).get();
 }
 
-module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, getLobbyReport, count, setGlobalUser, getGlobalUser };
+module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, getLobbyReport, count, setGlobalUser, getGlobalUser, setWin, setLose };

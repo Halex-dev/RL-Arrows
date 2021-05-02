@@ -328,10 +328,10 @@ async function getLobby() {
     await games.push(data);
   }
 
-  if(rows.length === undefined)
-  console.log("Recovery 0 games to reported!");
+  if (rows.length === undefined)
+    console.log("Recovery 0 games to reported!");
   else
-  console.log("Recovery " + rows.length + " games to reported!");
+    console.log("Recovery " + rows.length + " games to reported!");
 }
 
 //Ottiene le lobby ancora da reportare
@@ -478,7 +478,7 @@ async function Body(msg) {
       var index = await parseInt(args[0]);
       var report = args[1];
 
-      if (isNaN(index) || index < 0){
+      if (isNaN(index) || index < 0) {
         await Error(channel, "Errore", "ID lobby non valido (ES: ,report 123 win)");
         return;
       }
@@ -490,30 +490,47 @@ async function Body(msg) {
         return;
       }
 
-      if(id < 0){
+      if (id < 0) {
         await Error(channel, "Errore", "ID sbagliato il game non esiste");
         return;
       }
 
-      if( !(await games[id].team1.includes(user.id)) ||  !(await games[id].team2.includes(user.id)) ){
+      if (!(await games[id].team1.includes(user.id)) || !(await games[id].team2.includes(user.id))) {
         await Error(channel, "Errore", "Non puoi reportare un game a cui non partecipi");
         return;
       }
 
-      games[id].reported = user.id;
-      games[id].win = report;
+      try {
+        games[id].reported = user.id;
+        games[id].win = report;
 
-      data = {//DA FARE CHE METTE SOLO I NOMI SUL GETTEAM, CREARE FUNZIONE
+        data = {//DA FARE CHE METTE SOLO I NOMI SUL GETTEAM, CREARE FUNZIONE
           id: games[id].id,
           team1: games[id].team1.toString(),
           team2: games[id].team2.toString(),
           date: games[id].date,
           reported: user.id,
           win: report
+        }
+
+        var team1 = games[id].team1;
+        var team2 = games[id].team1;
+
+        for (var i = 0; i < team1.length; i++) {
+          await db.setWin("rl-3s", team1[i], guild.id);
+        }
+
+        for (var i = 0; i < team2.length; i++) {
+          await db.setLose("rl-3s", team2[i], guild.id);
+        }
+
+        await db.setLobby(data);
+        await games.slice(id, 1);
+      }
+      catch (e) {
+        await log(e);
       }
 
-      await db.setLobby(data);
-      await games.slice(id,1);
     }
     else if (command === 'test') {
 

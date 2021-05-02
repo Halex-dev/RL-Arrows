@@ -10,13 +10,12 @@ const { Client, MessageEmbed } = require('discord.js');
 const client = new Client();
 
 //Funzione per quando il bot va in run
-function Ready() {
+async function Ready() {
   try{
-    fun.setup(client, MessageEmbed);
-    var str = `-------------RL Arrows v1.0---------------\n`+
-              `Logged in as ${client.user.tag}!\n`+
-              `-----------------------------------------`;
-    console.log(str);
+    console.log("-------------RL Arrows v1.0---------------");
+    await fun.setup(client, MessageEmbed);
+    console.log(`Logged in as ${client.user.tag}!`);
+    console.log("-----------------------------------------");
   }
   catch(e){
     console.log(`Error: ` + e);

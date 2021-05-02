@@ -25,7 +25,7 @@ async function dbStart() {
 
   //---------------------------------- LOBBY ------------------------------
   //3s
-  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id TEXT PRIMARY KEY, team1 TEXT, team2 TEXT, date TEXT, win TEXT);").run();
+  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id INTEGER PRIMARY KEY, team1 TEXT, team2 TEXT, date TEXT, reported TEXT, win TEXT);").run();
   sql.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uniqueID ON 'lobby' (id);").run();
 
   //Impostazioni Database
@@ -82,7 +82,7 @@ async function getScore(table, guild, user){
 
 //Funzione per settare i dati di una lobby nel db
 async function setLobby(data){
-  sql.prepare(`INSERT OR REPLACE INTO \'lobby\' (id, team1, team2, date, win) VALUES (@id, @team1, @team2, @date, @win);`).run(data);
+  sql.prepare(`INSERT OR REPLACE INTO \'lobby\' (id, team1, team2, date, reported, win) VALUES (@id, @team1, @team2, @date, @reported, @win);`).run(data);
 }
 
 //Funzione per ottenere le lobby
@@ -92,7 +92,12 @@ async function getLobby(){
 
 //Funzione per ottenere che devono essere ancora reportate
 async function getLobbyReport(){
-  return await sql.prepare(`SELECT * FROM \'lobby\' WHERE win = ""`).all();
+  const table = sql.prepare("SELECT count(*) AS num FROM sqlite_master WHERE type='table' AND name = 'lobby';").get();
+
+  if(!table['num'])
+    return 0;
+
+  return await sql.prepare(`SELECT * FROM \'lobby\' WHERE win = \'\'`).all();
 }
 
 //Funzione per contare quante lobby esistono
@@ -100,4 +105,4 @@ async function count(table){
   return await sql.prepare(`SELECT COUNT(*) AS num FROM \'${table}\'`).get();
 }
 
-module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, count, setGlobalUser, getGlobalUser };
+module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, getLobbyReport, count, setGlobalUser, getGlobalUser };

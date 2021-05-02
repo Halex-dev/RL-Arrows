@@ -4,17 +4,18 @@ const internal = {};
 
 module.exports = class PreLobby{
 
-  constructor(players, channel) {
-      this.players = players.slice();
-      this.channel = channel;
-      this.choose = 1;
-      this.team1 = [];
-      this.team2 = [];
-      this.voto = {
-        votable: false,
-        r: [],
-        c: []
-      }
+  constructor(id, players, channel) {
+    this.id = id;
+    this.players = players.slice();
+    this.channel = channel;
+    this.choose = 1;
+    this.team1 = [];
+    this.team2 = [];
+    this.voto = {
+      notvotable: false,
+      r: [],
+      c: []
+    }
   }
 
   //Funzione che restituisce la classe user dell'utente cercato tramite index
@@ -31,6 +32,11 @@ module.exports = class PreLobby{
     }
     
     return id;
+  }
+
+  //Funzione per restituire l'id dalla lobby
+  async returnID(){
+    return this.id;
   }
 
   //Funzione per impostare i capitani (li rimuove automaticamente dalla lista)
@@ -54,13 +60,15 @@ module.exports = class PreLobby{
   async firstCap(userid){
     var c1 = await this.getCap1();
 
+    console.log(c1);
+
     if(c1 === undefined)
       return false;
 
     if(c1.id === userid)
-      true;
+      return true;
     else
-      false;
+      return false;
   }
 
   //Funzione aggiunge un voto
@@ -119,6 +127,34 @@ module.exports = class PreLobby{
     return this.team2;
   }
 
+  //Funzione restituisce il primo team
+  async getTeam1ToString(user){
+    var str = "";
+    
+    for(var i = 0; i < this.team1.length ; i++){
+      if(i < this.team1.length-1)
+        str += this.team1[i].id + ",";
+      else
+        str += this.team1[i].id;
+    }
+
+    return str;
+  }
+
+  //Funzione restituisce il secondo team
+  async getTeam2ToString(user){
+      var str = "";
+    
+    for(var i = 0; i < this.team2.length ; i++){
+      if(i < this.team2.length-1)
+        str += this.team2[i].id + ",";
+      else
+        str += this.team2[i].id;
+    }
+
+    return str;
+  }
+
   //Funzione aggiunge un voto
   async getVote(type){
     var vote;
@@ -143,6 +179,7 @@ module.exports = class PreLobby{
       i++;
     }
 
+    i = 0;
     while(id < 0 && i < this.team1.length ){
       if(this.team1[i].id == userid){
         id = i;
@@ -150,6 +187,7 @@ module.exports = class PreLobby{
       i++;
     }
 
+    i = 0;
     while(id < 0 && i < this.team2.length ){
       if(this.team2[i].id == userid){
         id = i;
@@ -247,12 +285,12 @@ module.exports = class PreLobby{
 
   //Funzione che restituisce se la lobby è ancora votabile o no
   async isVotable(){
-    return this.voto.votable;
+    return this.voto.notvotable;
   }
 
   //Funzione che restituisce se la lobby è ancora votabile o no
   async setNoVotable(){
-    this.voto.votable = true;
+    this.voto.notvotable = true;
   }
 
   //Funzione che restituisce la classe user dell'utente cercato
@@ -309,19 +347,13 @@ module.exports = class PreLobby{
   async getCap2(){
     var c2 = this.team2[0];
 
-    if(!c2)
-      return;
-
     return c2;
   }
 
   //Funzione che restituisce il primo capitano
   async getCap1(){
     var c1 = this.team1[0];
-
-    if(!c1)
-      return;
-
+    
     return c1;
   }
 

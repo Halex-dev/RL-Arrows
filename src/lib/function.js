@@ -12,11 +12,13 @@ const TIME_MSG = 100;
 const timer = ms => new Promise(res => setTimeout(res, ms));
 
 //ConfigFile
-const cfg = require("../config.js");
+var cfg = require("../config.json");
 
 //Librerie
 const db = require("./db.js");
 const preLobby = require("../class/pre-lobby.js");
+const fs = require("fs");
+const path = require('path');
 
 async function setup(c, msg) {
   try {
@@ -24,10 +26,26 @@ async function setup(c, msg) {
     MessageEmbed = msg;
 
     await getLobby();
+    await readJSON();
     await db.dbStart();
   }
   catch (e) {
     await log(e);
+  }
+}
+
+async function readJSON() {
+  cfg = require("../config.json");
+
+  console.log("File config ready");
+}
+
+async function saveJSON(data) {
+
+  try {
+    fs.writeFileSync(path.resolve(__dirname, '../config.json'), JSON.stringify(data))
+  } catch (err) {
+    console.error(err)
   }
 }
 
@@ -133,6 +151,34 @@ async function isLobby(user) {
   return trov;
 }
 
+async function isGames(user) {
+  var i = 0;
+  var trov = false;
+
+  while (i < games.length && !trov) {
+    if (games[i].id === user.id) {
+      trov = true;
+    }
+    i++;
+  }
+
+  return trov;
+}
+
+async function isQueue(queue, user) {
+  var i = 0;
+  var trov = false;
+
+  while (i < queue.length && !trov) {
+    if (queue[i].id === user.id) {
+      trov = true;
+    }
+    i++;
+  }
+
+  return trov;
+}
+
 async function idLobby() {
   return queue1s.length + queue2s.length + queue3s.length + 1;
 }
@@ -229,24 +275,31 @@ async function randomTeam(l) {
   }
 }
 
+async function lobby1s(l) {
+
+  await l.setNoVotable();
+  var players = await l.getPlayers();
+  var i = 0;
+
+  while (players.length > 0) {
+      var rand = await Math.round(await Math.random() * ((players.length - 1) - 0)) + 0;
+
+      if (i % 2 === 0)
+        await l.addTeam1(players[rand]);
+      else
+        await l.addTeam2(players[rand]);
+
+      i++;
+   }
+
+  await Embed(await l.getChannel(), "Lobby", await l.teamToString());
+  await createLobby(l);
+}
+
 async function resetArray(queue) {
   while (queue.length > 0) {
     await queue.splice(0, 1);
   }
-}
-
-async function isQueue(queue, user) {
-  var i = 0;
-  var trov = false;
-
-  while (i < queue.length && !trov) {
-    if (queue[i].id === user.id) {
-      trov = true;
-    }
-    i++;
-  }
-
-  return trov;
 }
 
 async function getDate() {
@@ -350,10 +403,24 @@ async function getIDLobbyReport(id) {
   return trov;
 }
 
+async function isAdmin(member){
+  if(!member.hasPermission('ADMINISTRATOR'))
+    return false;
+  else
+    return true;
+}
+
 async function Update(old, newuser) {//Update user if change paramater
   console.log(old);
   console.log(newuser);
+
+  data = db.getGlobalUser(old.id);
+
+  data.tag = newuser.tag;
+
+  db.setGlobalUser(data);
 }
+
 
 async function Body(msg) {
   //Non prendo in considerazione i bot
@@ -372,14 +439,120 @@ async function Body(msg) {
     const args = commandBody.split(' '); //splitto il comando e tutti gli argomenti (se ci sono)
     const command = args.shift().toLowerCase(); //prendo solo il comando
 
-    var queue = queue3s;
 
-    if (command === 'ping') {
-      await channel.send('pong');
+    if (await isAdmin(msg.member)) {
+      if (command === 'channel') {
+
+        var txt = args[0];
+
+        if(txt === undefined){
+          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"channel (1s,2s,3s)");
+          return;
+        }
+
+        if(txt === "3s"){
+          cfg.ch3s = msg.channel.id;
+        }
+        else if(txt === "2s"){
+          cfg.ch2s = msg.channel.id;
+        }
+        else if(txt === "1s"){
+          cfg.ch1s = msg.channel.id;
+        }
+        
+        await saveJSON(cfg);
+      }
+      else if(command === 'setscore'){
+        var txt = args[0];
+        var score = args[1];
+
+        if(txt === undefined || score === undefined){
+          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"setscore ");
+          return;
+        }
+
+        if(txt === "2-0"){
+          cfg.winEz = score;
+        }
+        else if(txt === "0-2"){
+          cfg.loseEz = score;
+        }
+        else if(txt === "2-1"){
+          cfg.win = score;
+        }
+        else if(txt === "1-2"){
+          cfg.lose = score;
+        }
+
+        await saveJSON(cfg);
+      }
+      else if(command === 'prefix'){
+        var txt = args[0];
+
+        if(txt === undefined){
+          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"prefix [prefisso] ");
+          return;
+        }
+
+        cfg.prefix = txt;
+
+        await saveJSON(cfg);
+      }
+      else if(command === 'clear'){
+
+        if(msg.channel.id === cfg.ch3s){
+          queue = queue3s;
+        }
+        else if(msg.channel.id === cfg.ch2s){
+          queue = queue2s;
+        }
+        else if(msg.channel.id === cfg.ch1s){
+          queue = queue1s;
+        }
+        else{
+          await Error(channel, "Errore", "Non sei in nessuno");
+          return;
+        }
+
+        queue = [];
+        await SendDM(channel, "Comando eseguito", "Queue clearata");
+      }
+      else if(command === 'help'){
+
+        channel.send("```Comandi admin: \n" +
+        "-channel: settare i channel delle partite\n"+
+        "-setscore: settare i punteggi delle partite\n"+
+        "-prefix: cambiare prefisso al bot\n"+
+        "-clear: pulire la queue su una determinata modalità\n ```");
+      }
     }
-    else if (command === 'q') {
+    
+    var queue = null;
+    var maxQueue = 0;
+    var modality = null;
 
-      if (await isLobby(user)) { //|| await isQueue(queue, user)
+    if(msg.channel.id === cfg.ch3s){
+      queue = queue3s;
+      maxQueue = 6;
+      modality = "rl-3s";
+    }
+    else if(msg.channel.id === cfg.ch2s){
+      queue = queue2s;
+      maxQueue = 4;
+      modality = "rl-2s";
+    }
+    else if(msg.channel.id === cfg.ch1s){
+      queue = queue1s;
+      maxQueue = 2;
+      modality = "rl-1s";
+    }
+
+    if(queue === null || maxQueue === 0 || modality === null)
+      return;
+
+    //Comandi utenti normali
+    if (command === 'q') {
+      if (await isLobby(user) && await isGames(user)) { //|| await isQueue(queue, user)
         await Error(channel, "Errore", "Sei in coda o hai già una lobby in corso, non puoi entrare in coda");
         return;
       }
@@ -393,10 +566,10 @@ async function Body(msg) {
         }
       }
 
-      data = await db.getUser("rl-3s", user.id, guild.id); //Prendo l'utente
+      data = await db.getUser(modality, user.id, guild.id); //Prendo l'utente
 
       if (!data) { //Se l'utente non è presente nella modalità desiderata, lo aggiungo
-        if (!(await createUserModality(user, guild, "rl-3s"))) {
+        if (!(await createUserModality(user, guild, modality))) {
           await Error(channel, "DB", "Errore nell'inserimento dell'utente");
           return;
         }
@@ -404,7 +577,11 @@ async function Body(msg) {
 
       await queue.push(user);
 
-      if (queue.length === 6) { //OCCHIO ALLO STOP MSG
+      if(maxQueue === 2 && queue.length === maxQueue){
+        var l = new preLobby(await idLobby(), queue, channel);
+        await lobby1s(l);
+      }
+      else if (queue.length === maxQueue) {
 
         await lobby.push(new preLobby(await idLobby(), queue, channel));
         var str = "6 Persone sono entrare nella queue e verrà creata la lobby.\n" +
@@ -446,8 +623,8 @@ async function Body(msg) {
         await l.setNoVotable();
 
         var players = await l.returnPlayers();
-        var row = await db.getScoreLobby("rl-3s", guild, players);
-        var cap1 = await l.getPlayer(row[0].user);
+        var row = await db.getScoreLobby(modality, guild, players);
+        var cap1 = await l.getPlayer(row[0].user); //ID
         var cap2 = await l.getPlayer(row[1].user);
 
         await l.setCap(cap1, cap2);
@@ -477,6 +654,7 @@ async function Body(msg) {
     else if (command === 'report') {
       var index = await parseInt(args[0]);
       var report = args[1];
+      var point = 0;
 
       if (isNaN(index) || index < 0) {
         await Error(channel, "Errore", "ID lobby non valido (ES: ,report 123 win)");
@@ -484,11 +662,6 @@ async function Body(msg) {
       }
 
       id = await getIDLobbyReport(index);
-
-      if (report !== "win" && report !== "lose") {
-        await Error(channel, "Errore", "Il testo del report deve essere win o lose");
-        return;
-      }
 
       if (id < 0) {
         await Error(channel, "Errore", "ID sbagliato il game non esiste");
@@ -500,11 +673,28 @@ async function Body(msg) {
         return;
       }
 
+      if(report === "2-0"){
+        point = cfg.winEz;
+      }
+      else if(report === "0-2"){
+        point = cfg.loseEz;
+      }
+      else if(report === "2-1"){
+        point = cfg.win;
+      }
+      else if(report === "1-2"){
+        point = cfg.lose;
+      }
+      else{
+        await Error(channel, "Errore", "Il testo del report deve essere il risultato, es: 2-1");
+        return;
+      }
+
       try {
         games[id].reported = user.id;
         games[id].win = report;
 
-        data = {//DA FARE CHE METTE SOLO I NOMI SUL GETTEAM, CREARE FUNZIONE
+        data = {
           id: games[id].id,
           team1: games[id].team1.toString(),
           team2: games[id].team2.toString(),
@@ -517,24 +707,25 @@ async function Body(msg) {
         var team2 = games[id].team1;
 
         for (var i = 0; i < team1.length; i++) {
-          await db.setWin("rl-3s", team1[i], guild.id);
+          await db.setWin(modality, team1[i], guild.id, point);
         }
 
         for (var i = 0; i < team2.length; i++) {
-          await db.setLose("rl-3s", team2[i], guild.id);
+          await db.setLose(modality, team2[i], guild.id, point);
         }
 
         await db.setLobby(data);
-        await games.slice(id, 1);
       }
       catch (e) {
         await log(e);
+        return;
       }
-
+      
+      await games.splice(id, 1);
     }
     else if (command === 'test') {
 
-      console.log("----------QUEUE-------------");
+      /*console.log("----------QUEUE-------------");
       console.log(queue);
 
       console.log("----------Lobby-------------");
@@ -560,7 +751,11 @@ async function Body(msg) {
       }
 
       console.log("----------GAMES-------------");
-      console.log(games);
+      console.log(games);*/
+      if(!msg.member.hasPermission('ADMINISTRATOR'))
+        return msg.reply('No Perms!');
+      else
+        console.log("suca");
     }
   }
   else if (await isCap(user)) { //Sono nei DM e sono capitano

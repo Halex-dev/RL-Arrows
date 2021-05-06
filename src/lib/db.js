@@ -56,13 +56,13 @@ async function getGlobalUser(id){
 }
 
 //Funzione per aggiornate la win
-async function setWin(table ,userid, guildid){
-  return await sql.prepare(`UPDATE \'${table}\' SET win = win + 1 WHERE user = ? AND guild = ?`).run(userid, guildid);
+async function setWin(table ,userid, guildid, point){
+  return await sql.prepare(`UPDATE \'${table}\' SET win = win + ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
 }
 
 //Funzione per aggiornate la lose
-async function setLose(table ,userid, guildid){
-  return await sql.prepare(`UPDATE \'${table}\' SET lose = lose + 1 WHERE user = ? AND guild = ?`).run(userid, guildid);
+async function setLose(table ,userid, guildid, point){
+  return await sql.prepare(`UPDATE \'${table}\' SET lose = lose + ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
 }
 
 //Funzione ottenere una leaderboard

@@ -180,7 +180,7 @@ async function isQueue(queue, user) {
 }
 
 async function idLobby() {
-  return queue1s.length + queue2s.length + queue3s.length + 1;
+  return queue1s.length + queue2s.length + queue3s.length + lobby.length + games.length + 1;
 }
 
 //Funzione per verificare se un utente è in un altra lobby.
@@ -344,7 +344,7 @@ async function createLobby(l) {
 
   await removeLobby(l);
   await db.setLobby(data);
-  await games.push(data);
+  games.push(data);
 }
 
 //Inserisce la lobby nel db
@@ -356,7 +356,7 @@ async function removeLobby(l) {
   while (i < lobby.length && trov < 0) {
     if (await l.returnID() === await lobby[i].returnID()) {
       trov = i;
-      await lobby.splice(i, 1);
+      lobby.splice(i, 1);
     }
     i++;
   }
@@ -378,7 +378,7 @@ async function getLobby() {
       reported: rows[i].reported,
       win: ""
     }
-    await games.push(data);
+    games.push(data);
   }
 
   if (rows.length === undefined)
@@ -410,9 +410,64 @@ async function isAdmin(member){
     return true;
 }
 
+//Funzione per ottenere l'index dell'utente
+async function getIndexUser(userid, queue) {
+  var i = 0;
+  var trov = -1;
+
+  while (i < queue.length && trov < 0) {
+    if (queue[i].id === userid) {
+      trov = i;
+    }
+    i++;
+  }
+
+  return trov;
+}
+
+async function cleanUser(userid, modality){
+
+  if(modality === "rl-3s"){
+    var id1 = await getIndexUser(userid, queue1s);
+    var id2 = await getIndexUser(userid, queue2s);
+
+    if(id1 >= 0)
+      queue1s.splice(id1, 1);
+
+    if(id2 >= 0)
+      queue2s.splice(id2, 1);
+  }
+  else if(modality === "rl-2s"){
+    var id1 = await getIndexUser(userid, queue1s);
+    var id2 = await getIndexUser(userid, queue3s);
+
+    if(id1 >= 0)
+      queue1s.splice(id1, 1);
+    
+    if(id2 >= 0)
+      queue3s.splice(id2, 1);
+  }
+  else if(modality === "rl-1s"){
+    var id1 = await getIndexUser(userid, queue3s);
+    var id2 = await getIndexUser(userid, queue2s);
+
+    if(id1 >= 0)
+      queue3s.splice(id1, 1);
+
+    if(id2 >= 0)
+      queue2s.splice(id2, 1);
+  }
+  
+}
+
+async function togglePeople(queue, modality){
+  var tmp = queue;
+  for (var i = 0; i < tmp.length; i++) {
+    await cleanUser(tmp[i].id, modality);
+  }
+}
+
 async function Update(old, newuser) {//Update user if change paramater
-  console.log(old);
-  console.log(newuser);
 
   data = db.getGlobalUser(old.id);
 
@@ -575,28 +630,35 @@ async function Body(msg) {
         }
       }
 
-      await queue.push(user);
+      queue.push(user);
 
       if(maxQueue === 2 && queue.length === maxQueue){
         var l = new preLobby(await idLobby(), queue, channel);
         await lobby1s(l);
+        await togglePeople(queue, modality);
+        await resetArray(queue);
       }
       else if (queue.length === maxQueue) {
 
-        await lobby.push(new preLobby(await idLobby(), queue, channel));
+        lobby.push(new preLobby(await idLobby(), queue, channel));
         var str = "6 Persone sono entrare nella queue e verrà creata la lobby.\n" +
           "**Players:** " + await TagPlayer(queue) + "\n" +
           "Scegliere la modalità della lobby, Capitani (,c) o Random (,r)";
 
-        await resetArray(queue);
-        await Embed(channel, "Lobby", str);
+        Embed(channel, "Lobby", str);
+        togglePeople(queue, modality);
+        resetArray(queue);
       }
       else {
         await Embed(channel, "Lista", queue.length + ' giocatori nella lista!');
       }
     }
     else if (command === 'l' && await isQueue(queue, user)) {
-      await queue.pop(user.id);
+      var id = await getIndexUser(user.id, queue);
+
+      if(id >= 0)
+        queue.splice(id1, 1);
+
       await Embed(channel, "Lista", queue.length + ' giocatori nella lista!');
     }
     else if (command === 'c') {
@@ -721,13 +783,16 @@ async function Body(msg) {
         return;
       }
       
-      await games.splice(id, 1);
+      games.splice(id, 1);
+    }
+    else if (command === 'f') {
+      console.log("f");
     }
     else if (command === 'test') {
 
-      /*console.log("----------QUEUE-------------");
+      console.log("----------QUEUE-------------");
       console.log(queue);
-
+      console.log("leng:" + queue.length);
       console.log("----------Lobby-------------");
       console.log(lobby);
       console.log("j: " + await getIdLobby(user));
@@ -751,11 +816,7 @@ async function Body(msg) {
       }
 
       console.log("----------GAMES-------------");
-      console.log(games);*/
-      if(!msg.member.hasPermission('ADMINISTRATOR'))
-        return msg.reply('No Perms!');
-      else
-        console.log("suca");
+      console.log(games);
     }
   }
   else if (await isCap(user)) { //Sono nei DM e sono capitano

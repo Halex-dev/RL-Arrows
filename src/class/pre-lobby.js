@@ -51,9 +51,9 @@ module.exports = class PreLobby{
       return;*/
 
     if(type === "r")
-      await this.voto.r.push(user.id);
+      this.voto.r.push(user.id);
     else
-      await this.voto.c.push(user.id);
+      this.voto.c.push(user.id);
   }
 
   //Funzione che restituisce true se sei il primo capitano, false altrimenti
@@ -102,18 +102,18 @@ module.exports = class PreLobby{
 
     if(index == -1) return;
 
-    await this.players.splice(index, 1);
+    this.players.splice(index, 1);
   }
 
   //Funzione che aggiunge un utente al team1
   async addTeam1(user){
-    await this.team1.push(user);
+    this.team1.push(user);
     await this.remPlayer(user);
   }
 
   //Funzione che aggiunge un utente al team2
   async addTeam2(user){
-    await this.team2.push(user);
+    this.team2.push(user);
     await this.remPlayer(user);
   }
 

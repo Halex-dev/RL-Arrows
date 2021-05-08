@@ -1,4 +1,5 @@
 const Discord = require("discord.js")
+var http = require("http"); 
 
 //Librerie 
 const fun = require("./src/lib/function.js");
@@ -44,3 +45,12 @@ return;
 client.on("message", msg => fun.Body(msg));
 client.on("userUpdate", (user, usernew) => fun.Update(user, usernew));
 client.login(process.env.TOKEN);
+
+var server = http.createServer(function(request, response) {  
+    response.writeHead(200, {  
+        'Content-Type': 'text/plain'  
+    });  
+    response.write("Suca Sounds Farai gol.");  
+    response.end();  
+});  
+server.listen(8082); 

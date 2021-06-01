@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Leaderbords</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+      <link href="src/css/style.css" rel="stylesheet" type="text/css">
+      <link rel="shortcut icon" href="src/img/favicon.ico" />
+    </head>
+    <body>
+      <table style="width:100%">
+        <tr>
+          <th>Posizione</th>
+          <th>User</th>
+          <th>Win</th>
+          <th>Lose</th>
+          <th>Points</th>
+        </tr>
+        <%
+        if(userData.length!=0){
+        var i=1;
+        userData.forEach(function(data){
+        %>
+        <tr>
+            <td><%=i; %></td>
+            <td><%=data.tag %></td>
+            <td><%=data.win %></td>
+            <td><%=data.lose %></td>
+            <td><%=data.points %></td>
+        </tr>
+        <%  i++; }) %>
+        <% } else{ %>
+            <tr>
+                <td colspan="7">No Data Found</td>
+            </tr>
+        <% } %>
+
+      </table>
+    </body>
+  </html>

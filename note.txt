@@ -1,3 +1,0 @@
-//channel.send("<@" + message.author.id + ">");
-
-!dm.includes(msg.author.id)

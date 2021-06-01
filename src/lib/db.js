@@ -25,7 +25,7 @@ async function dbStart() {
 
   //---------------------------------- LOBBY ------------------------------
   //3s
-  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id INTEGER PRIMARY KEY, team1 TEXT, team2 TEXT, date TEXT, reported TEXT, win TEXT);").run();
+  sql.prepare("CREATE TABLE IF NOT EXISTS 'lobby' (id INTEGER PRIMARY KEY, team1 TEXT, team2 TEXT, date TEXT, reported TEXT, score TEXT);").run();
   sql.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uniqueID ON 'lobby' (id);").run();
 
   //Impostazioni Database
@@ -57,17 +57,22 @@ async function getGlobalUser(id){
 
 //Funzione per aggiornate la win
 async function setWin(table ,userid, guildid, point){
-  return await sql.prepare(`UPDATE \'${table}\' SET win = win + ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
+  return await sql.prepare(`UPDATE \'${table}\' SET win = win + 1, points = points + ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
 }
 
 //Funzione per aggiornate la lose
 async function setLose(table ,userid, guildid, point){
-  return await sql.prepare(`UPDATE \'${table}\' SET lose = lose + ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
+  return await sql.prepare(`UPDATE \'${table}\' SET lose = lose + 1, points = points - ? WHERE user = ? AND guild = ?`).run(point, userid, guildid);
 }
 
 //Funzione ottenere una leaderboard
 async function getLead(table, limit, guild){
   return await sql.prepare(`SELECT * FROM \'${table}\' WHERE guild = ? ORDER BY points DESC LIMIT ?;`).all(guild.id, limit);
+}
+
+//Funzione ottenere una leaderboard
+function getLeadNoLimit(table, guild){
+  return sql.prepare(`SELECT tag,win,lose,points FROM \'${table}\' AS t1 INNER JOIN user ON t1.user = user.id WHERE guild = ? ORDER BY points DESC;`).all(guild);
 }
 
 async function getScoreLobby(table, guild, users){
@@ -92,7 +97,7 @@ async function getScore(table, guild, user){
 
 //Funzione per settare i dati di una lobby nel db
 async function setLobby(data){
-  sql.prepare(`INSERT OR REPLACE INTO \'lobby\' (id, team1, team2, date, reported, win) VALUES (@id, @team1, @team2, @date, @reported, @win);`).run(data);
+  sql.prepare(`INSERT OR REPLACE INTO \'lobby\' (id, team1, team2, date, reported, score) VALUES (@id, @team1, @team2, @date, @reported, @score);`).run(data);
 }
 
 //Funzione per ottenere le lobby
@@ -107,7 +112,7 @@ async function getLobbyReport(){
   if(!table['num'])
     return 0;
 
-  return await sql.prepare(`SELECT * FROM \'lobby\' WHERE win = \'\'`).all();
+  return await sql.prepare(`SELECT * FROM \'lobby\' WHERE score = \'\'`).all();
 }
 
 //Funzione per contare quante lobby esistono
@@ -115,4 +120,4 @@ async function count(table){
   return await sql.prepare(`SELECT COUNT(*) AS num FROM \'${table}\'`).get();
 }
 
-module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, getLobbyReport, count, setGlobalUser, getGlobalUser, setWin, setLose };
+module.exports = { dbStart, getUser, setUser, getLead, getScoreLobby, getScore, setLobby, getLobby, getLobbyReport, count, setGlobalUser, getGlobalUser, setWin, setLose, getLeadNoLimit};

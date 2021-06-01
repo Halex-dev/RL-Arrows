@@ -1,5 +1,5 @@
+//Discord libreria
 const Discord = require("discord.js")
-var http = require("http"); 
 
 //Librerie 
 const fun = require("./src/lib/function.js");
@@ -22,6 +22,8 @@ async function Ready() {
     console.log(`Error: ` + e);
   }
 }
+
+//------------------------------------ PARTE DISCORD----------------------------
 
 client.on("ready", () => Ready());
 
@@ -46,11 +48,42 @@ client.on("message", msg => fun.Body(msg));
 client.on("userUpdate", (user, usernew) => fun.Update(user, usernew));
 client.login(process.env.TOKEN);
 
-var server = http.createServer(function(request, response) {  
-    response.writeHead(200, {  
-        'Content-Type': 'text/plain'  
-    });  
-    response.write("Suca Sounds Farai gol.");  
-    response.end();  
-});  
-server.listen(8082); 
+//------------------------------------ PARTE SERVER WEB ----------------------------
+
+var express = require('express');
+var path = require('path');
+var bodyParser = require('body-parser');
+
+var createError = require('http-errors');
+var cookieParser = require('cookie-parser');
+var logger = require('morgan');
+var rl3s = require('./web/routes/3s');
+var app = express();
+
+// view engine setup
+app.use('/', rl3s);
+app.set('views', path.join(__dirname, 'web/views'));
+app.use(express.static(path.join(__dirname, 'web/file')));
+app.set('view engine', 'ejs');
+
+
+app.get('/', (req, res)=>{
+  res.render('index');
+});
+
+// catch 404 and forward to error handler
+app.use(function(req, res, next) {
+  next(createError(404));
+});
+
+// error handler
+app.use(function(err, req, res, next) {
+  // set locals, only providing error in development
+  res.locals.message = err.message;
+  res.locals.error = req.app.get('env') === 'development' ? err : {};
+  // render the error page
+  res.status(err.status || 500);
+  res.render('error');
+});
+
+app.listen(3000);

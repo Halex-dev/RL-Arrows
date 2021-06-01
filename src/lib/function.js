@@ -339,11 +339,14 @@ async function createLobby(l) {
     team2: await l.getTeam2ToString(),
     date: await getDate(),
     reported: "",
-    win: ""
+    score: ""
   }
 
   await removeLobby(l);
   await db.setLobby(data);
+
+  data.team1 = data.team1.split(',');
+  data.team2 = data.team2.split(',');
   games.push(data);
 }
 
@@ -376,7 +379,7 @@ async function getLobby() {
       team2: tmp2,
       date: rows[i].date,
       reported: rows[i].reported,
-      win: ""
+      score: ""
     }
     games.push(data);
   }
@@ -522,7 +525,7 @@ async function Body(msg) {
         var score = args[1];
 
         if(txt === undefined || score === undefined){
-          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"setscore ");
+          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"setscore (2-0, 0-2, 2-1 , 1-2) score");
           return;
         }
 
@@ -537,6 +540,10 @@ async function Body(msg) {
         }
         else if(txt === "1-2"){
           cfg.lose = score;
+        }
+        else{
+          await Error(channel, "Errore", "Syntx error: "+ cfg.prefix +"setscore (2-0, 0-2, 2-1 , 1-2) score");
+          return;
         }
 
         await saveJSON(cfg);
@@ -657,7 +664,7 @@ async function Body(msg) {
       var id = await getIndexUser(user.id, queue);
 
       if(id >= 0)
-        queue.splice(id1, 1);
+        queue.splice(id, 1);
 
       await Embed(channel, "Lista", queue.length + ' giocatori nella lista!');
     }
@@ -716,10 +723,11 @@ async function Body(msg) {
     else if (command === 'report') {
       var index = await parseInt(args[0]);
       var report = args[1];
-      var point = 0;
+      var pointW = 0;
+      var pointL = 0;
 
       if (isNaN(index) || index < 0) {
-        await Error(channel, "Errore", "ID lobby non valido (ES: ,report 123 win)");
+        await Error(channel, "Errore", "ID lobby non valido (ES: ,report idlobby risultato)");
         return;
       }
 
@@ -730,22 +738,41 @@ async function Body(msg) {
         return;
       }
 
-      if (!(await games[id].team1.includes(user.id)) || !(await games[id].team2.includes(user.id))) {
+      var where = "";
+      
+      if(await games[id].team1.includes(user.id)){
+        where = "team1";
+      }
+      else if(await games[id].team2.includes(user.id)){
+        where = "team2";
+      }
+      
+      if (where !== "team2" && where !== "team1") {
         await Error(channel, "Errore", "Non puoi reportare un game a cui non partecipi");
         return;
       }
 
+      var win = null;
+
       if(report === "2-0"){
-        point = cfg.winEz;
+        pointW = cfg.winEz;
+        pointL = cfg.loseEz;
+        win = true;
       }
       else if(report === "0-2"){
-        point = cfg.loseEz;
+        pointW = cfg.winEz;
+        pointL = cfg.loseEz;
+        win = false;
       }
       else if(report === "2-1"){
-        point = cfg.win;
+        pointW = cfg.win;
+        pointL = cfg.lose;
+        win = true;
       }
       else if(report === "1-2"){
-        point = cfg.lose;
+        pointW = cfg.win;
+        pointL = cfg.lose;
+        win = false;
       }
       else{
         await Error(channel, "Errore", "Il testo del report deve essere il risultato, es: 2-1");
@@ -756,24 +783,64 @@ async function Body(msg) {
         games[id].reported = user.id;
         games[id].win = report;
 
+        var team1 = games[id].team1;
+        var team2 = games[id].team1;
+
         data = {
           id: games[id].id,
           team1: games[id].team1.toString(),
           team2: games[id].team2.toString(),
           date: games[id].date,
           reported: user.id,
-          win: report
+          score: report
         }
 
         var team1 = games[id].team1;
-        var team2 = games[id].team1;
+        var team2 = games[id].team2;
 
-        for (var i = 0; i < team1.length; i++) {
-          await db.setWin(modality, team1[i], guild.id, point);
+        console.log(win);
+        console.log(where);
+
+        if(win){
+          if(where === "team1"){
+            console.log(team1);
+            for (var i = 0; i < team1.length; i++) {
+              await db.setWin(modality, team1[i], guild.id, pointW);
+            }
+
+            for (var i = 0; i < team2.length; i++) {
+              await db.setLose(modality, team2[i], guild.id, pointL);
+            }
+          }
+          else{
+            for (var i = 0; i < team1.length; i++) {
+              await db.setLose(modality, team1[i], guild.id, pointL);
+            }
+
+            for (var i = 0; i < team2.length; i++) {
+              await db.setWin(modality, team2[i], guild.id, pointW);
+            }
+          }
         }
+        else{
+          if(where === "team1"){
+            for (var i = 0; i < team1.length; i++) {
+              await db.setLose(modality, team1[i], guild.id, pointL);
+            }
 
-        for (var i = 0; i < team2.length; i++) {
-          await db.setLose(modality, team2[i], guild.id, point);
+            for (var i = 0; i < team2.length; i++) {
+              await db.setWin(modality, team2[i], guild.id, pointW);
+            }
+          }
+          else{
+            for (var i = 0; i < team1.length; i++) {
+              await db.setWin(modality, team1[i], guild.id, pointW);
+            }
+
+            for (var i = 0; i < team2.length; i++) {
+              await db.setLose(modality, team2[i], guild.id, pointL);
+            }
+          }
         }
 
         await db.setLobby(data);
@@ -790,32 +857,6 @@ async function Body(msg) {
     }
     else if (command === 'test') {
 
-      console.log("----------QUEUE-------------");
-      console.log(queue);
-      console.log("leng:" + queue.length);
-      console.log("----------Lobby-------------");
-      console.log(lobby);
-      console.log("j: " + await getIdLobby(user));
-
-      var j = await getIdLobby(user);
-
-      if (j != -1) {
-        var l = lobby[j];
-        var id = parseInt(command);
-
-        console.log("----------INFO-------------");
-        console.log("Turno: " + await l.myTurn(user.id));
-        console.log("ID: " + id);
-        console.log("First capitan: ");
-        console.log(await l.firstCap(user.id));
-
-        console.log("----------L-------------");
-        console.log(l);
-        console.log("----------SIZE-------------");
-        console.log(await l.getSizeQueue());
-      }
-
-      console.log("----------GAMES-------------");
       console.log(games);
     }
   }
